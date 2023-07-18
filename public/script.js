@@ -979,22 +979,25 @@ async function getBackgrounds() {
         const getData = await response.json();
         //background = getData;
         //console.log(getData.length);
+        $("#bg_menu_content").empty();
         for (const bg of getData) {
-            const thumbPath = getThumbnailUrl('bg', bg);
-            $("#bg_menu_content").append(
-                `<div class="bg_example flex-container" bgfile="${bg}" class="bg_example_img" title="${bg}" style="background-image: url('${thumbPath}');">
-                    <div bgfile="${bg}" class="bg_example_cross fa-solid fa-circle-xmark"></div>
-                    <div class="BGSampleTitle">
-                        ${bg
-                    .replace('.png', '')
-                    .replace('.jpg', '')
-                    .replace('.webp', '')}
-                </div>
-                </div>`
-            );
+            const template = getBackgroundFromTemplate(bg);
+            $("#bg_menu_content").append(template);
         }
     }
 }
+
+function getBackgroundFromTemplate(bg) {
+    const thumbPath = getThumbnailUrl('bg', bg);
+    const template = $('#background_template .bg_example').clone();
+    template.attr('bgfile', bg);
+    template.attr('title', bg);
+    template.find('.bg_button').attr('bgfile', bg);
+    template.css('background-image', `url('${thumbPath}')`);
+    template.find('.BGSampleTitle').text(bg.slice(0, bg.lastIndexOf('.')));
+    return template;
+}
+
 async function isColab() {
     is_checked_colab = true;
     const response = await fetch("/iscolab", {
@@ -1539,7 +1542,7 @@ function substituteParams(content, _name1, _name2, _original, _group) {
     _group = _group ?? name2;
 
     if (!content) {
-        return ''
+        return '';
     }
 
     // Replace {{original}} with the original message
@@ -1563,6 +1566,11 @@ function substituteParams(content, _name1, _name2, _original, _group) {
     content = content.replace(/{{time}}/gi, moment().format('LT'));
     content = content.replace(/{{date}}/gi, moment().format('LL'));
     content = content.replace(/{{idle_duration}}/gi, () => getTimeSinceLastMessage());
+    content = content.replace(/{{time_UTC([-+]\d+)}}/gi, (_, offset) => {
+        const utcOffset = parseInt(offset, 10);
+        const utcTime = moment().utc().utcOffset(utcOffset).format('LT');
+        return utcTime;
+    });
     content = randomReplace(content);
     return content;
 }
@@ -5735,11 +5743,7 @@ function read_bg_load(input) {
                         "background-image",
                         `url("${e.target.result}")`
                     );
-                    $("#form_bg_download").after(
-                        `<div class="bg_example" bgfile="${html}" style="background-image: url('${getThumbnailUrl('bg', html)}');">
-                            <div class="bg_example_cross fa-solid fa-circle-xmark"></div>
-                        </div>`
-                    );
+                    $("#form_bg_download").after(getBackgroundFromTemplate(html));
                 },
                 error: function (jqXHR, exception) {
                     console.log(exception);
@@ -6868,6 +6872,18 @@ async function doImpersonate() {
     $("#option_impersonate").trigger('click', { fromSlashCommand: true })
 }
 
+async function doDeleteChat() {
+    $("#option_select_chat").trigger('click', { fromSlashCommand: true })
+    await delay(100)
+    let currentChatDeleteButton = $(".select_chat_block[highlight='true']").parent().find('.PastChat_cross')
+    $(currentChatDeleteButton).trigger('click', { fromSlashCommand: true })
+    await delay(1)
+    $("#dialogue_popup_ok").trigger('click')
+    //200 delay needed let the past chat view reshow first
+    await delay(200)
+    $("#select_chat_cross").trigger('click')
+}
+
 const isPwaMode = window.navigator.standalone;
 if (isPwaMode) { $("body").addClass('PWA') }
 
@@ -6891,6 +6907,7 @@ $(document).ready(function () {
     registerSlashCommand('dupe', DupeChar, [], "– duplicates the currently selected character", true, true);
     registerSlashCommand('api', connectAPISlash, [], "(kobold, horde, novel, ooba, oai, claude, poe, windowai) – connect to an API", true, true);
     registerSlashCommand('impersonate', doImpersonate, ['imp'], "- calls an impersonation response", true, true);
+    registerSlashCommand('delchat', doDeleteChat, [], "- deletes the current chat", true, true);
 
 
     setTimeout(function () {
@@ -7124,6 +7141,41 @@ $(document).ready(function () {
         });
 
     });
+
+    $(document).on('click', '.bg_example_edit', async function (e) {
+        e.stopPropagation();
+        const old_bg = $(this).attr('bgfile');
+
+        if (!old_bg) {
+            console.debug('no bgfile');
+            return;
+        }
+
+        const fileExtension = old_bg.split('.').pop();
+        const old_bg_extensionless = old_bg.replace(`.${fileExtension}`, '');
+        const new_bg_extensionless = await callPopup('<h3>Enter new background name:</h3>', 'input', old_bg_extensionless);
+        const new_bg = `${new_bg_extensionless}.${fileExtension}`;
+
+        if (old_bg_extensionless === new_bg_extensionless) {
+            console.debug('new_bg === old_bg');
+            return;
+        }
+
+        const data = { old_bg, new_bg };
+        const response = await fetch('/renamebackground', {
+            method: 'POST',
+            headers:getRequestHeaders(),
+            body: JSON.stringify(data),
+            cache: 'no-cache',
+        });
+
+        if (response.ok) {
+            await getBackgrounds();
+        } else {
+            toastr.warning('Failed to rename background');
+        }
+    });
+
     $(document).on("click", ".bg_example_cross", function (e) {
         e.stopPropagation();
         bg_file_for_del = $(this);
@@ -7135,7 +7187,7 @@ $(document).ready(function () {
 
     $(document).on("click", ".PastChat_cross", function () {
         chat_file_for_del = $(this).attr('file_name');
-        console.log('detected cross click for' + chat_file_for_del);
+        console.debug('detected cross click for' + chat_file_for_del);
         popup_type = "del_chat";
         callPopup("<h3>Delete the Chat File?</h3>");
     });
@@ -7287,7 +7339,6 @@ $(document).ready(function () {
                 chat_metadata = {};
                 characters[this_chid].chat = name2 + " - " + humanizedDateTime();
                 $("#selected_chat_pole").val(characters[this_chid].chat);
-                saveCharacterDebounced();
                 getChat();
             }
         }
@@ -7596,15 +7647,20 @@ $(document).ready(function () {
         var id = $(this).attr("id");
 
         if (id == "option_select_chat") {
-            if ((selected_group && !is_group_generating) || (this_chid !== undefined && !is_send_press)) {
+            if ((selected_group && !is_group_generating) || (this_chid !== undefined && !is_send_press) || fromSlashCommand) {
                 displayPastChats();
-                $("#shadow_select_chat_popup").css("display", "block");
-                $("#shadow_select_chat_popup").css("opacity", 0.0);
-                $("#shadow_select_chat_popup").transition({
-                    opacity: 1.0,
-                    duration: animation_duration,
-                    easing: animation_easing,
-                });
+                //this is just to avoid the shadow for past chat view when using /delchat
+                //however, the dialog popup still gets one..
+                if (!fromSlashCommand) {
+                    console.log('displaying shadow')
+                    $("#shadow_select_chat_popup").css("display", "block");
+                    $("#shadow_select_chat_popup").css("opacity", 0.0);
+                    $("#shadow_select_chat_popup").transition({
+                        opacity: 1.0,
+                        duration: animation_duration,
+                        easing: animation_easing,
+                    });
+                }
             }
         }
 
