@@ -1,12 +1,12 @@
 {
-    "username": "You",
+    "username": "Zoey",
     "api_server": "http://localhost:5000/api",
     "api_server_textgenerationwebui": "http://127.0.0.1:7860",
-    "preset_settings": "Classic-Pygmalion-6b",
-    "user_avatar": "legat.png",
+    "preset_settings": "Calibrated-Pygmalion-6b",
+    "user_avatar": "1688039068106.png",
     "amount_gen": 180,
     "max_context": 2048,
-    "main_api": "poe",
+    "main_api": "textgenerationwebui",
     "world_info": {
         "globalSelect": []
     },
@@ -50,7 +50,9 @@
     },
     "swipes": false,
     "horde_settings": {
-        "models": [],
+        "models": [
+            "KoboldAI/OPT-13B-Erebus"
+        ],
         "auto_adjust_response_length": true,
         "auto_adjust_context_length": false,
         "trusted_workers_only": false
@@ -79,7 +81,7 @@
         "fast_ui_mode": true,
         "avatar_style": 0,
         "chat_display": 0,
-        "chat_width": 50,
+        "chat_width": 66,
         "never_resize_avatars": false,
         "show_card_avatar_urls": false,
         "play_message_sound": false,
@@ -137,10 +139,17 @@
             "preset": "Alpaca",
             "separator_sequence": ""
         },
-        "personas": {},
+        "personas": {
+            "1688039068106.png": "Zoey"
+        },
         "default_persona": null,
-        "persona_descriptions": {},
-        "persona_description": "",
+        "persona_descriptions": {
+            "1688039068106.png": {
+                "description": "",
+                "position": 0
+            }
+        },
+        "persona_description": "Short, Chinese, Female, innocent, ditzy, cute. Large breasts, hourglass figure, plush thighs. Long brown hair, doe-like brown eyes, rosy cheeks and plump pink lips.",
         "persona_description_position": 0,
         "custom_stopping_strings": "",
         "sheld_width": 0,
@@ -462,12 +471,12 @@
     "model_novel": "euterpe-v2",
     "preset_settings_novel": "Classic-Euterpe",
     "streaming_novel": false,
-    "temp": 0.65,
-    "rep_pen": 1.1,
+    "temp": 1,
+    "rep_pen": 1.01,
     "rep_pen_range": 1024,
     "top_p": 0.9,
     "top_a": 0,
-    "top_k": 0,
+    "top_k": 40,
     "typical": 1,
     "tfs": 0.9,
     "rep_pen_slope": 0.9,
@@ -475,13 +484,13 @@
     "use_stop_sequence": false,
     "streaming_kobold": false,
     "sampler_order": [
+        6,
         0,
         1,
         2,
         3,
         4,
-        5,
-        6
+        5
     ],
     "temp_openai": "0.9",
     "freq_pen_openai": 0.7,
@@ -526,12 +535,12 @@
     "wi_format": "[Details of the fictional world the RP is set in:\n{0}]\n",
     "openai_model": "gpt-3.5-turbo",
     "claude_model": "claude-instant-v1",
-    "windowai_model": "",
-    "openrouter_model": "OR_Website",
+    "windowai_model": "anthropic/claude-v1",
+    "openrouter_model": "anthropic/claude-instant-v1-100k",
     "jailbreak_system": false,
     "reverse_proxy": "",
     "legacy_streaming": false,
-    "chat_completion_source": "openrouter",
+    "chat_completion_source": "windowai",
     "max_context_unlocked": false,
     "api_url_scale": ""
 }
