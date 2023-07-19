@@ -437,6 +437,7 @@ const system_messages = {
             <li><tt>{​{date}​}</tt> - the current date</li>
             <li><tt>{{idle_duration}}</tt> - the time since the last user message was sent</li>
             <li><tt>{{random:(args)}}</tt> - returns a random item from the list. (ex: {{random:1,2,3,4}} will return 1 of the 4 numbers at random. Works with text lists too.</li>
+            <li><tt>{{roll:(formula)}}</tt> - rolls a dice. (ex: {{roll:1d6}} will roll a 6-sided dice and return a number between 1 and 6)</li>
             </ul>`
     },
     welcome:
@@ -1057,6 +1058,7 @@ async function delChat(chatfile) {
     if (response.ok === true) {
         // choose another chat if current was deleted
         if (chatfile.replace('.jsonl', '') === characters[this_chid].chat) {
+            chat_metadata = {};
             await replaceCurrentChat();
         }
     }
@@ -1108,7 +1110,6 @@ function clearChat() {
         $('.zoomed_avatar[forChar]').remove();
     } else { console.debug('saw no avatars') }
     itemizedPrompts = [];
-    chat_metadata = {};
 }
 
 async function deleteLastMessage() {
@@ -1551,6 +1552,7 @@ function substituteParams(content, _name1, _name2, _original) {
         return utcTime;
     });
     content = randomReplace(content);
+    content = diceRollReplace(content);
     return content;
 }
 
@@ -1601,6 +1603,23 @@ function randomReplace(input, emptyListPlaceholder = '') {
 
         //const randomIndex = Math.floor(Math.random() * list.length);
         return list[randomIndex];
+    });
+}
+
+function diceRollReplace(input, invalidRollPlaceholder = '') {
+    const randomPattern = /{{roll:([^}]+)}}/gi;
+
+    return input.replace(randomPattern, (match, matchValue) => {
+        const formula = matchValue.trim();
+        const isValid = droll.validate(formula);
+
+        if (!isValid) {
+            console.debug(`Invalid roll formula: ${formula}`);
+            return invalidRollPlaceholder;
+        }
+
+        const result = droll.roll(formula);
+        return new String(result.total);
     });
 }
 
@@ -1710,7 +1729,7 @@ export function extractMessageBias(message) {
         return null;
     }
 
-    const forbiddenMatches = ['user', 'char', 'time', 'date', 'random', 'idle_duration'];
+    const forbiddenMatches = ['user', 'char', 'time', 'date', 'random', 'idle_duration', 'roll'];
     const found = [];
     const rxp = /\{\{([\s\S]+?)\}\}/gm;
     //const rxp = /{([^}]+)}/g;
@@ -1719,8 +1738,8 @@ export function extractMessageBias(message) {
     while ((curMatch = rxp.exec(message))) {
         const match = curMatch[1].trim();
 
-        // Ignore random pattern matches
-        if (/^random:.+/i.test(match)) {
+        // Ignore random/roll pattern matches
+        if (/^random:.+/i.test(match) || /^roll:.+/i.test(match)) {
             continue;
         }
 
@@ -4213,19 +4232,17 @@ async function getChatResult() {
             is_user: false,
             is_name: true,
             send_date: getMessageTimeStamp(),
-            mes: firstMes,
+            mes: getRegexedString(firstMes, regex_placement.AI_OUTPUT),
         };
 
         if (Array.isArray(alternateGreetings) && alternateGreetings.length > 0) {
             chat[0]['swipe_id'] = 0;
-            chat[0]['swipes'] = [];
+            chat[0]['swipes'] = [chat[0]['mes']].concat(
+                alternateGreetings.map(
+                    (greeting) => substituteParams(getRegexedString(greeting, regex_placement.AI_OUTPUT))
+                )
+            );
             chat[0]['swipe_info'] = [];
-            chat[0]['swipes'][0] = chat[0]['mes'];
-
-            for (let i = 0; i < alternateGreetings.length; i++) {
-                const alternateGreeting = alternateGreetings[i];
-                chat[0]['swipes'].push(substituteParams(alternateGreeting));
-            }
         }
     }
     printMessages();
@@ -6251,7 +6268,7 @@ async function createOrEditCharacter(e) {
                             chat[0]['swipes'][0] = chat[0]['mes'];
 
                             for (let i = 0; i < alternateGreetings.length; i++) {
-                                const alternateGreeting = alternateGreetings[i];
+                                const alternateGreeting = getRegexedString(alternateGreetings[i], regex_placement.AI_OUTPUT);
                                 chat[0]['swipes'].push(substituteParams(alternateGreeting));
                             }
                         }
@@ -6483,7 +6500,7 @@ const swipe_right = () => {
     } else if (parseInt(chat[chat.length - 1]['swipe_id']) < chat[chat.length - 1]['swipes'].length) { //otherwise, if the id is less than the number of swipes
         chat[chat.length - 1]['mes'] = chat[chat.length - 1]['swipes'][chat[chat.length - 1]['swipe_id']]; //load the last mes box with the latest generation
         chat[chat.length - 1]['send_date'] = chat[chat.length - 1]?.swipe_info[chat[chat.length - 1]['swipe_id']]?.send_date || chat[chat.length - 1]['send_date']; //update send date
-        chat[chat.length - 1]['extra'] = JSON.parse(JSON.stringify(chat[chat.length - 1].swipe_info[chat[chat.length - 1]['swipe_id']]?.extra || chat[chat.length - 1].extra));
+        chat[chat.length - 1]['extra'] = JSON.parse(JSON.stringify(chat[chat.length - 1].swipe_info[chat[chat.length - 1]['swipe_id']]?.extra || chat[chat.length - 1].extra || []));
         run_swipe_right = true; //then prepare to do normal right swipe to show next message
     }
 
